@@ -444,7 +444,7 @@ const ProfileForm = () => {
                   Payment Information
                 </label>
                 <p className="text-sm text-gray-600 mb-2">
-                  A one-time fee of $5.00 will be charged to create your
+                  A one-time fee of $2.00 will be charged to create your
                   profile.
                 </p>
               </div>
