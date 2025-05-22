@@ -94,67 +94,30 @@ export const UI = () => {
     return "";
   };
 
-  // Generate navigation buttons - keeping it simple and clear
-  const generateNavigationButtons = () => {
-    const buttons = [];
-
-    // Cover button
-    buttons.push(
-      <NavButton
-        key="cover"
-        label="Cover"
-        isActive={page === 0}
-        onClick={() => setPage(0)}
-      />,
-    );
-
-    // Content pages buttons
-    if (PAGE_CONTENTS && PAGE_CONTENTS.length > 0) {
-      // Add a button for each content page
-      for (let i = 0; i < PAGE_CONTENTS.length; i++) {
-        const pageNum = i + 1;
-        buttons.push(
-          <NavButton
-            key={`page-${pageNum}`}
-            label={`Page ${pageNum}`}
-            isActive={page === pageNum}
-            onClick={() => setPage(pageNum)}
-          />,
-        );
-      }
-    }
-
-    // Back cover button
-    buttons.push(
-      <NavButton
-        key="back-cover"
-        label="Back Cover"
-        isActive={page === backCoverIndex}
-        onClick={() => setPage(backCoverIndex)}
-      />,
-    );
-
-    return buttons;
-  };
-
   // Main UI
   return (
     <Elements stripe={stripePromise}>
-      {/* Your other components including ProfileForm */}
-
       <main className="pointer-events-none select-none fixed inset-0 z-10 flex flex-col justify-between">
-        {/* Navigation bar */}
-        <div className="w-full pointer-events-auto overflow-auto flex justify-center">
-          <div className="flex items-center gap-4 max-w-full p-10 overflow-auto">
-            {generateNavigationButtons()}
-            <div className="ml-6">
-              <button
-                className="px-4 py-3 rounded-full text-lg bg-blue-500 text-white hover:bg-blue-600 transition-all duration-300"
-                onClick={() => setProfileFormVisible(!profileFormVisible)}
-              >
-                {profileFormVisible ? "Hide Profile" : "Edit Profile"}
-              </button>
-            </div>
+        {/* Hacker Mode Navigation bar */}
+        <div className="w-full pointer-events-auto overflow-hidden flex justify-center">
+          <div className="flex items-center p-6">
+            <button
+              className="relative px-6 py-4 font-mono text-lg bg-black border-2 border-green-400 text-green-400 hover:bg-green-400 hover:text-black transition-all duration-300 uppercase tracking-wider shadow-lg hover:shadow-green-400/50"
+              onClick={() => setProfileFormVisible(!profileFormVisible)}
+              style={{
+                clipPath:
+                  "polygon(10px 0%, 100% 0%, calc(100% - 10px) 100%, 0% 100%)",
+                fontFamily: "Courier New, monospace",
+              }}
+            >
+              <span className="relative z-10">
+                {profileFormVisible ? "[HIDE_PROFILE]" : "[Join_Hackers]"}
+              </span>
+              {/* Glitch effect overlay */}
+              <div className="absolute inset-0 bg-green-400 opacity-0 hover:opacity-20 transition-opacity duration-200"></div>
+              {/* Animated border effect */}
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-green-400 via-transparent to-green-400 opacity-75 blur-sm"></div>
+            </button>
           </div>
         </div>
 
@@ -591,22 +554,5 @@ const ProfileForm = () => {
     </div>
   );
 };
-// Extracted button component for cleaner code
-const NavButton = ({ label, isActive, onClick }) => (
-  <button
-    className={`
-      border transition-all duration-300
-      px-4 py-3 rounded-full text-lg uppercase shrink-0
-      ${
-        isActive
-          ? "bg-white/90 text-black border-white"
-          : "bg-black/30 text-white border-transparent hover:border-white"
-      }
-    `}
-    onClick={onClick}
-  >
-    {label}
-  </button>
-);
 
 export default UI;
