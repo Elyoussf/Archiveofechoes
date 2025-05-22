@@ -88,6 +88,7 @@ export async function createCustomPageTexture(pageNumber, size = 1024) {
 
   return canvas;
 }
+
 async function drawContentPage(
   ctx,
   size,
@@ -200,62 +201,26 @@ async function drawContentPage(
         : `/${profile}`
       : null;
 
-    // Draw profile in a circle with terminal-style overlay
+    // Draw profile in a circle with CLEAR, COLORFUL display
     if (fixedProfile) {
-      // For URL images, we need to load them first
-      const drawRest = () => {
-        // After image loads (or fails), draw the rest of the content
-        drawContentAfterImage();
-      };
-
       // Use a promise to handle image loading
       const loadImage = () => {
         return new Promise((resolve, reject) => {
           const img = new Image();
 
           img.onload = () => {
-            // Add glitch-like effect for profile image
+            // Create a circular clip for the image
             ctx.save();
             ctx.beginPath();
             ctx.arc(circleX, circleY, radius, 0, Math.PI * 2);
             ctx.clip();
 
-            // Apply vintage terminal effect
+            // Draw the image CLEARLY without any effects that obscure it
             ctx.drawImage(img, imageX, imageY, imageSize, imageSize);
-
-            // Add scanlines over the image
-            ctx.globalAlpha = 0.2;
-            for (let i = 0; i < imageSize; i += 2) {
-              ctx.fillStyle = "#000000";
-              ctx.fillRect(imageX, imageY + i, imageSize, 1);
-            }
-            ctx.globalAlpha = 1.0;
-
-            // Add green tint
-            ctx.globalAlpha = 0.3;
-            ctx.fillStyle = terminalText;
-            ctx.fillRect(imageX, imageY, imageSize, imageSize);
-            ctx.globalAlpha = 1.0;
 
             ctx.restore();
 
-            // Draw glitch effect over the profile image
-            ctx.globalAlpha = 0.3;
-            for (let i = 0; i < 10; i++) {
-              const glitchX = imageX + Math.random() * imageSize;
-              const glitchHeight = 2 + Math.random() * 10;
-              const glitchWidth = 20 + Math.random() * 60;
-              ctx.fillStyle = terminalText;
-              ctx.fillRect(
-                glitchX,
-                imageY + Math.random() * imageSize,
-                glitchWidth,
-                glitchHeight,
-              );
-            }
-            ctx.globalAlpha = 1.0;
-
-            // Draw circle border
+            // Draw a clean circle border
             ctx.beginPath();
             ctx.arc(circleX, circleY, radius, 0, Math.PI * 2);
             ctx.strokeStyle = terminalText;
@@ -333,13 +298,6 @@ async function drawContentPage(
       ctx.textBaseline = "middle";
       ctx.fillText(profile || "?", circleX, circleY);
 
-      // Add scanlines
-      ctx.globalAlpha = 0.2;
-      for (let i = 0; i < imageSize; i += 2) {
-        ctx.fillStyle = "#000000";
-        ctx.fillRect(imageX, imageY + i, imageSize, 1);
-      }
-      ctx.globalAlpha = 1.0;
       ctx.restore();
 
       // Draw circle border
