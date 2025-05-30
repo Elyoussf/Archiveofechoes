@@ -1,12 +1,7 @@
 import { atom, useAtom } from "jotai";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { usePageData } from "./CustomPageContent";
-import { Elements } from "@stripe/react-stripe-js";
-import { loadStripe } from "@stripe/stripe-js";
-import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-const stripePromise = loadStripe(
-  "pk_test_51RRF07AsCrE7xvqCcp2zVyMeQVpN5xyps10k76shGWZGcRCnZEMsmZHSGM96vFw16ksGhVBcQNF3L1GCQu1hXURI00FIbyVDf9",
-);
+
 // Create atom for current page state (0 = cover, pages.length+1 = back cover)
 export const pageAtom = atom(0);
 // Create atom for form visibility
@@ -96,40 +91,38 @@ export const UI = () => {
 
   // Main UI
   return (
-    <Elements stripe={stripePromise}>
-      <main className="pointer-events-none select-none fixed inset-0 z-10 flex flex-col justify-between">
-        {/* Hacker Mode Navigation bar */}
-        <div className="w-full pointer-events-auto overflow-hidden flex justify-center">
-          <div className="flex items-center p-6">
-            <button
-              className="relative px-6 py-4 font-mono text-lg bg-black border-2 border-green-400 text-green-400 hover:bg-green-400 hover:text-black transition-all duration-300 uppercase tracking-wider shadow-lg hover:shadow-green-400/50"
-              onClick={() => setProfileFormVisible(!profileFormVisible)}
-              style={{
-                clipPath:
-                  "polygon(10px 0%, 100% 0%, calc(100% - 10px) 100%, 0% 100%)",
-                fontFamily: "Courier New, monospace",
-              }}
-            >
-              <span className="relative z-10">
-                {profileFormVisible ? "[HIDE_PROFILE]" : "[Join_Hackers]"}
-              </span>
-              {/* Glitch effect overlay */}
-              <div className="absolute inset-0 bg-green-400 opacity-0 hover:opacity-20 transition-opacity duration-200"></div>
-              {/* Animated border effect */}
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-green-400 via-transparent to-green-400 opacity-75 blur-sm"></div>
-            </button>
-          </div>
+    <main className="pointer-events-none select-none fixed inset-0 z-10 flex flex-col justify-between">
+      {/* Hacker Mode Navigation bar */}
+      <div className="w-full pointer-events-auto overflow-hidden flex justify-center">
+        <div className="flex items-center p-6">
+          <button
+            className="relative px-6 py-4 font-mono text-lg bg-black border-2 border-green-400 text-green-400 hover:bg-green-400 hover:text-black transition-all duration-300 uppercase tracking-wider shadow-lg hover:shadow-green-400/50"
+            onClick={() => setProfileFormVisible(!profileFormVisible)}
+            style={{
+              clipPath:
+                "polygon(10px 0%, 100% 0%, calc(100% - 10px) 100%, 0% 100%)",
+              fontFamily: "Courier New, monospace",
+            }}
+          >
+            <span className="relative z-10">
+              {profileFormVisible ? "[HIDE_PROFILE]" : "[Join_Hackers]"}
+            </span>
+            {/* Glitch effect overlay */}
+            <div className="absolute inset-0 bg-green-400 opacity-0 hover:opacity-20 transition-opacity duration-200"></div>
+            {/* Animated border effect */}
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-green-400 via-transparent to-green-400 opacity-75 blur-sm"></div>
+          </button>
         </div>
+      </div>
 
-        {/* Profile Form Modal - explicitly make this interactive */}
-        {profileFormVisible && <ProfileForm />}
+      {/* Profile Form Modal - explicitly make this interactive */}
+      {profileFormVisible && <ProfileForm />}
 
-        {/* Page title display */}
-        <div className="p-4 text-center text-white/70 text-sm">
-          <p>{getCurrentPageInfo()}</p>
-        </div>
-      </main>
-    </Elements>
+      {/* Page title display */}
+      <div className="p-4 text-center text-white/70 text-sm">
+        <p>{getCurrentPageInfo()}</p>
+      </div>
+    </main>
   );
 };
 
@@ -143,14 +136,9 @@ const ProfileForm = () => {
     success: false,
     message: "",
   });
-  const [clientSecret, setClientSecret] = useState("");
   const [paymentStep, setPaymentStep] = useState("form"); // form, payment, success
-  const [profileData, setProfileData] = useState(null);
+  const [sessionId, setSessionId] = useState("");
   const [, setProfileFormVisible] = useAtom(profileFormVisibleAtom);
-
-  // Load Stripe Elements
-  const stripe = useStripe();
-  const elements = useElements();
 
   // Function to validate URLs
   const isValidURL = (url) => {
@@ -162,7 +150,7 @@ const ProfileForm = () => {
     }
   };
 
-  // Handle initial form submission
+  // Handle form submission and redirect to Paddle checkout
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -173,9 +161,8 @@ const ProfileForm = () => {
     );
 
     try {
-      // Create a payment intent first
-      const paymentResponse = await fetch(
-        "https://goldfish-app-bb4s2.ondigitalocean.app/create-payment-intent",
+      const response = await fetch(
+        "https://goldfish-app-bb4s2.ondigitalocean.app/create-checkout",
         {
           method: "POST",
           headers: {
@@ -189,22 +176,17 @@ const ProfileForm = () => {
         },
       );
 
-      const paymentResult = await paymentResponse.json();
+      const result = await response.json();
 
-      if (paymentResult.success) {
-        // Store the client secret and profile data for the next step
-        setClientSecret(paymentResult.clientSecret);
-        setProfileData({
-          username,
-          catchphrase,
-          links: validLinks,
-        });
-        // Move to payment step
-        setPaymentStep("payment");
+      if (result.success) {
+        // Store session ID for status checking
+        setSessionId(result.sessionId);
+        // Redirect to Paddle checkout
+        window.location.href = result.checkoutUrl;
       } else {
         setSubmitResult({
           success: false,
-          message: paymentResult.message || "Failed to initiate payment",
+          message: result.message || "Failed to create checkout session",
         });
       }
     } catch (error) {
@@ -212,97 +194,57 @@ const ProfileForm = () => {
         success: false,
         message: "An error occurred. Please try again.",
       });
-      console.error("Error initiating payment:", error);
+      console.error("Error creating checkout:", error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Handle payment submission
-  const handlePaymentSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
-    if (!stripe || !elements) {
-      setSubmitResult({
-        success: false,
-        message: "Stripe has not loaded yet. Please try again.",
-      });
-      setIsSubmitting(false);
-      return;
-    }
-
-    try {
-      // Confirm the card payment
-      const result = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card: elements.getElement(CardElement),
-          billing_details: {
-            name: username,
-          },
-        },
-      });
-
-      if (result.error) {
-        // Show error to user
-        setSubmitResult({
-          success: false,
-          message: result.error.message || "Payment failed",
-        });
-      } else {
-        if (result.paymentIntent.status === "succeeded") {
-          // Payment is successful, now save the profile
-          await saveProfile(result.paymentIntent.id);
-        }
-      }
-    } catch (error) {
-      setSubmitResult({
-        success: false,
-        message: "An error occurred during payment. Please try again.",
-      });
-      console.error("Payment error:", error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Function to save profile after successful payment
-  const saveProfile = async (paymentIntentId) => {
+  // Check payment status (useful if you want to handle return from Paddle)
+  const checkPaymentStatus = useCallback(async (sessionId) => {
     try {
       const response = await fetch(
-        "https://goldfish-app-bb4s2.ondigitalocean.app/complete-profile",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            ...profileData,
-            paymentIntentId,
-          }),
-        },
+        `https://goldfish-app-bb4s2.ondigitalocean.app/check-payment/${sessionId}`,
       );
-
       const result = await response.json();
 
-      if (result.success) {
-        setSubmitResult({ success: result.success, message: result.message });
+      if (result.success && result.status === "completed") {
         setPaymentStep("success");
+        setSubmitResult({
+          success: true,
+          message: "Profile created successfully!",
+        });
+      } else if (result.status === "pending") {
+        // Still processing
+        setTimeout(() => checkPaymentStatus(sessionId), 2000);
       } else {
         setSubmitResult({
           success: false,
-          message: result.message || "Failed to save profile",
+          message: "Payment was not completed or session expired.",
         });
       }
     } catch (error) {
+      console.error("Error checking payment status:", error);
+    }
+  }, []);
+
+  // Handle URL parameters on component mount (for return from Paddle)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionIdFromUrl = urlParams.get("sessionId");
+    const status = urlParams.get("status");
+
+    if (sessionIdFromUrl && status === "success") {
+      setSessionId(sessionIdFromUrl);
+      setPaymentStep("processing");
+      checkPaymentStatus(sessionIdFromUrl);
+    } else if (status === "cancelled") {
       setSubmitResult({
         success: false,
-        message:
-          "An error occurred when saving your profile. Please contact support.",
+        message: "Payment was cancelled. You can try again.",
       });
-      console.error("Error saving profile:", error);
     }
-  };
+  }, [checkPaymentStatus]);
 
   // Handle adding a new link
   const addLink = () => {
@@ -329,7 +271,7 @@ const ProfileForm = () => {
         <div className="p-6">
           <h2 className="text-2xl font-bold mb-6 text-gray-800">
             {paymentStep === "form" && "Edit Your Profile"}
-            {paymentStep === "payment" && "Complete Payment"}
+            {paymentStep === "processing" && "Processing Payment..."}
             {paymentStep === "success" && "Profile Updated!"}
           </h2>
 
@@ -447,6 +389,9 @@ const ProfileForm = () => {
                   A one-time fee of $2.00 will be charged to create your
                   profile.
                 </p>
+                <p className="text-xs text-gray-500">
+                  You'll be redirected to Paddle's secure checkout page.
+                </p>
               </div>
 
               <div className="flex justify-end gap-3 mt-6">
@@ -462,55 +407,29 @@ const ProfileForm = () => {
                   disabled={isSubmitting}
                   className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-blue-300"
                 >
-                  {isSubmitting ? "Processing..." : "Continue to Payment"}
+                  {isSubmitting
+                    ? "Creating Checkout..."
+                    : "Continue to Payment"}
                 </button>
               </div>
             </form>
           )}
 
-          {paymentStep === "payment" && (
-            <form onSubmit={handlePaymentSubmit}>
+          {paymentStep === "processing" && (
+            <div className="text-center">
               <div className="mb-6">
-                <p className="text-gray-700 mb-4">
-                  Almost done! Complete your payment to create your profile.
-                </p>
-                <div className="p-4 border border-gray-300 rounded mb-4">
-                  <CardElement
-                    options={{
-                      style: {
-                        base: {
-                          fontSize: "16px",
-                          color: "#424770",
-                          "::placeholder": {
-                            color: "#aab7c4",
-                          },
-                        },
-                        invalid: {
-                          color: "#9e2146",
-                        },
-                      },
-                    }}
-                  />
+                <div className="mx-auto bg-blue-100 rounded-full p-3 w-16 h-16 flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
+                <h3 className="text-xl font-medium text-gray-900 mt-4">
+                  Processing Payment
+                </h3>
+                <p className="text-gray-600 mt-2">
+                  Please wait while we process your payment and create your
+                  profile...
+                </p>
               </div>
-
-              <div className="flex justify-between gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setPaymentStep("form")}
-                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                >
-                  Back
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !stripe}
-                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-blue-300"
-                >
-                  {isSubmitting ? "Processing Payment..." : "Pay $5.00"}
-                </button>
-              </div>
-            </form>
+            </div>
           )}
 
           {paymentStep === "success" && (
